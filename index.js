@@ -1,42 +1,3 @@
-const { container, canvas, ctx } = init();
-
-canvas.addEventListener('mousedown', handleMouseDown);
-canvas.addEventListener('mouseup', handleMouseUp);
-canvas.addEventListener('mousemove', handleMouseMove);
-document.addEventListener('keydown', handleKeyDown);
-
-const graph = {
-  points: [],
-  segments: []
-};
-
-const editor = {
-  hovered: null,
-  selected: null,
-  dragged: null
-}
-
-// Core
-function init() {
-  const container = document.getElementById('container');
-
-  const canvas = document.getElementById('canvas');
-
-  canvas.width = 600;
-  canvas.height = 600;
-
-  const context = canvas.getContext('2d');
-
-  return { container, canvas, ctx: context };
-}
-
-function render(canvas, ctx) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  graph.segments.forEach(segment => segment.draw(ctx));
-  graph.points.forEach(point => point.draw(ctx));
-}
-
 // Primitives
 class Point {
   x;
@@ -105,113 +66,200 @@ class Segment {
   }
 }
 
-let isDragging = false;
+class Graph {
+  points;
+
+  segments;
+
+  constructor(points = [], segments = []) {
+    this.points = points;
+
+    this.segments = segments;
+  }
+
+  draw(ctx) {
+    this.segments.forEach(segment => segment.draw(ctx));
+    this.points.forEach(point => point.draw(ctx));
+  }
+
+  #hasPoint(point) {
+    return this.points.find(p => p.isEqual(point));
+  }
+
+  addPoint(p) {
+    if (this.#hasPoint(p)) return null;
+
+    const point = new Point(p);
+
+    this.points.push(point);
+
+    return point;
+  }
+
+  #hasSegment(point1, point2) {
+    return this.segments.find(segment => segment.isEqual(point1, point2))
+  }
+
+  addSegment(point1, point2) {
+    if (this.#hasSegment(point1, point2)) return null;
+
+    const segment = new Segment({ point1, point2 });
+
+    this.segments.push(segment);
+
+    return segment;
+  }
+}
+
+class GraphEditor {
+  container;
+
+  canvas;
+
+  ctx;
+
+  graph;
+
+  hoveredElement;
+
+  selectedElement;
+
+  draggedElement;
+
+  constructor(container) {
+    this.container = container;
+
+    const canvas = document.createElement('canvas');
+
+    canvas.width = 600;
+    canvas.height = 600;
+
+    this.canvas = canvas;
+
+    this.container.appendChild(this.canvas);
+
+    const context = canvas.getContext('2d');
+
+    this.ctx = context;
+
+    this.graph = new Graph();
+
+    this.hoveredElement = null;
+
+    this.selectedElement = null;
+
+    this.draggedElement = null;
+  }
+
+  render() {
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.graph.draw(this.ctx);
+  }
+}
 
 // Events
 function handleMouseDown(event) {
-  isDragging = true;
-
   const { offsetX: mouseX, offsetY: mouseY } = event;
 
-  if (editor.hovered) {
-    editor.dragged = editor.hovered;
+  if (graphEditor.hoveredElement) {
+    graphEditor.draggedElement = graphEditor.hoveredElement;
 
-    if (!editor.selected) {
-      editor.selected = editor.hovered;
+    if (!graphEditor.selectedElement) {
+      graphEditor.selectedElement = graphEditor.hoveredElement;
 
-      editor.selected.selected = true;
+      graphEditor.selectedElement.selected = true;
 
-      render(canvas, ctx);
+      graphEditor.render();
     } else {
-      if (editor.selected !== editor.hovered) {
-        editor.selected.selected = false;
-        editor.hovered.selected = true;
+      if (graphEditor.selectedElement !== graphEditor.hoveredElement) {
+        graphEditor.selectedElement.selected = false;
+        graphEditor.hoveredElement.selected = true;
 
-        const segmentAlreadyExists = graph.segments.find(segment => segment.isEqual(editor.selected, editor.hovered))
+        const segmentAlreadyExists = graphEditor.graph.segments.find(segment => segment.isEqual(graphEditor.selectedElement, graphEditor.hoveredElement))
 
         if (!segmentAlreadyExists) {
-          const segment = new Segment({ point1: editor.selected, point2: editor.hovered });
-          graph.segments.push(segment);
+          graphEditor.graph.addSegment(graphEditor.selectedElement, graphEditor.hoveredElement);
         }
 
-        editor.selected = editor.hovered;
+        graphEditor.selectedElement = graphEditor.hoveredElement
       } else {
-        editor.selected.selected = false;
-        editor.selected = null;
+        graphEditor.selectedElement.selected = false;
+        graphEditor.selectedElement = null;
       }
     }
 
     return;
   }
 
-  const point = new Point({ x: mouseX, y: mouseY });
-  graph.points.push(point);
+  const createdPoint = graphEditor.graph.addPoint({ x: mouseX, y: mouseY });
 
-  if (editor.selected) {
-    editor.selected.selected = false;
+  if (graphEditor.selectedElement) {
+    graphEditor.selectedElement.selected = false;
 
-    const segment = new Segment({ point1: editor.selected, point2: point });
-    graph.segments.push(segment);
+    graphEditor.graph.addSegment(graphEditor.selectedElement, createdPoint)
   }
 
-  point.selected = true;
-  editor.selected = point;
+  createdPoint.selected = true;
+  graphEditor.selectedElement = createdPoint;
 
-  render(canvas, ctx);
+  graphEditor.render();
 }
 
 function handleMouseUp() {
-  isDragging = false;
-  editor.hovered = null;
+  graphEditor.draggedElement = null;
 }
 
 function handleMouseMove(event) {
   const { offsetX: mouseX, offsetY: mouseY } = event;
 
-  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graph.points, 5);
+  if (graphEditor.draggedElement) {
+    graphEditor.canvas.style.cursor = 'grabbing';
 
-  if (editor.dragged && isDragging) {
-    editor.dragged.x = mouseX;
-    editor.dragged.y = mouseY;
+    graphEditor.draggedElement.x = mouseX;
+    graphEditor.draggedElement.y = mouseY;
 
-    render(canvas, ctx);
+    graphEditor.render();
     return;
   };
 
+  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graphEditor.graph.points, 5);
+
   if (hoveredPoint) {
-    editor.hovered = hoveredPoint;
-    hoveredPoint.hovered = true;
-    canvas.style.cursor = 'pointer';
+    graphEditor.hoveredElement = hoveredPoint;
+
+    graphEditor.hoveredElement.hovered = true;
+
+    graphEditor.canvas.style.cursor = 'pointer';
   } else {
-    editor.hovered = false;
-    for (const point of graph.points) {
-      if (point.hovered) {
-        point.hovered = false;
-        canvas.style.cursor = 'inherit';
-      }
+    graphEditor.hoveredElement = null;
+    graphEditor.canvas.style.cursor = 'inherit';
+
+    for (const point of graphEditor.graph.points) {
+      if (point.hovered) point.hovered = false;
     }
   }
 
-  render(canvas, ctx);
+  graphEditor.render();
 
-  if (editor.selected) {
-    render(canvas, ctx);
+  if (graphEditor.selectedElement) {
+    graphEditor.render();
 
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]);
-    ctx.moveTo(editor.selected.x, editor.selected.y);
-    ctx.lineTo(mouseX, mouseY);
-    ctx.stroke();
+    graphEditor.ctx.beginPath();
+    graphEditor.ctx.setLineDash([5, 5]);
+    graphEditor.ctx.moveTo(graphEditor.selectedElement.x, graphEditor.selectedElement.y);
+    graphEditor.ctx.lineTo(mouseX, mouseY);
+    graphEditor.ctx.stroke();
   }
 }
 
 function handleKeyDown(event) {
   switch (event.key) {
     case 'Escape':
-      editor.selected.selected = false;
-      editor.selected = null;
+      graphEditor.selectedElement.selected = false;
+      graphEditor.selectedElement = null;
 
-      render(canvas, ctx);
+      graphEditor.render();
       break;
     default:
       break;
@@ -234,3 +282,13 @@ function getClosestPoint(x, y, points, limit = Number.MAX_SAFE_INTEGER) {
 
   return [closestPoint, min_distance];
 }
+
+// Application
+const container = document.getElementById('container');
+
+const graphEditor = new GraphEditor(container);
+
+graphEditor.canvas.addEventListener('mousedown', handleMouseDown);
+graphEditor.canvas.addEventListener('mouseup', handleMouseUp);
+graphEditor.canvas.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('keydown', handleKeyDown);
