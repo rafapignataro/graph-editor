@@ -54,7 +54,9 @@ class Segment {
     ctx.setLineDash([]);
     ctx.moveTo(this.point1.x, this.point1.y);
     ctx.lineTo(this.point2.x, this.point2.y);
+    ctx.strokeStyle = this.hovered ? 'red' : this.selected ? 'green' : 'black';
     ctx.stroke();
+    ctx.strokeStyle = 'black';
   }
 
   isEqual(point1, point2) {
@@ -223,22 +225,21 @@ function handleMouseMove(event) {
     return;
   };
 
-  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graphEditor.graph.points, 5);
-
-  if (hoveredPoint) {
-    graphEditor.hoveredElement = hoveredPoint;
-
-    graphEditor.hoveredElement.hovered = true;
-
-    graphEditor.canvas.style.cursor = 'pointer';
-  } else {
-    graphEditor.hoveredElement = null;
-    graphEditor.canvas.style.cursor = 'inherit';
-
-    for (const point of graphEditor.graph.points) {
-      if (point.hovered) point.hovered = false;
-    }
+  for (const point of graphEditor.graph.points) {
+    if (point.hovered) point.hovered = false;
   }
+
+  for (const segment of graphEditor.graph.segments) {
+    if (segment.hovered) segment.hovered = false;
+  }
+
+  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graphEditor.graph.points, 5);
+  const [hoveredSegment] = getClosestSegment(mouseX, mouseY, graphEditor.graph.segments, 5);
+
+  graphEditor.hoveredElement = hoveredPoint || hoveredSegment || null;
+  graphEditor.canvas.style.cursor = graphEditor.hoveredElement ? 'pointer' : 'inherit';
+
+  if (graphEditor.hoveredElement) graphEditor.hoveredElement.hovered = true;
 
   graphEditor.render();
 
@@ -283,6 +284,29 @@ function getClosestPoint(x, y, points, limit = Number.MAX_SAFE_INTEGER) {
   return [closestPoint, min_distance];
 }
 
+function getClosestSegment(x, y, segments, limit = Number.MAX_SAFE_INTEGER) {
+  let min_distance = Number.MAX_SAFE_INTEGER;
+  let closestSegment = null;
+
+  for (const segment of segments) {
+    const distance = getPointDistanceToSegment({ x, y }, segment);
+
+    if (distance < min_distance && distance !== 0 && distance < limit) {
+      min_distance = distance;
+      closestSegment = segment;
+    }
+  }
+
+  return [closestSegment, min_distance]
+}
+
+function getPointDistanceToSegment(point, segment) {
+  const numerator = Math.abs((segment.point2.x - segment.point1.x) * (segment.point1.y - point.y) - (segment.point1.x - point.x) * (segment.point2.y - segment.point1.y));
+  const denominator = Math.sqrt((segment.point2.x - segment.point1.x) ** 2 + (segment.point2.y - segment.point1.y) ** 2);
+
+  return numerator / denominator;
+}
+
 // Application
 const container = document.getElementById('container');
 
@@ -292,3 +316,4 @@ graphEditor.canvas.addEventListener('mousedown', handleMouseDown);
 graphEditor.canvas.addEventListener('mouseup', handleMouseUp);
 graphEditor.canvas.addEventListener('mousemove', handleMouseMove);
 document.addEventListener('keydown', handleKeyDown);
+graphEditor.canvas.addEventListener('contextmenu', event => event.preventDefault());
