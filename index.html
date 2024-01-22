@@ -19,10 +19,16 @@
       height: 100dvh;
 
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
 
       background: #1e1e1e;
+    }
+
+    #container h1 {
+      color: #fff;
+      margin-bottom: 1rem;
     }
 
     #container canvas {
@@ -33,6 +39,7 @@
 
 <body>
   <div id="container">
+    <h1>Graph Editor</h1>
   </div>
   <script src="index.js"></script>
 </body>
