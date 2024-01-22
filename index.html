@@ -12,34 +12,64 @@
       box-sizing: border-box;
       min-width: 0;
       min-height: 0;
+      color: #1d1d1d;
     }
 
-    #container {
-      width: 100dvw;
+    body {
+      background-color: #fcfcfc;
+      background-size: 20px 20px;
+      background-image: linear-gradient(to right, #f4f4f4 1px, transparent 1px), linear-gradient(to bottom, #f4f4f4 1px, transparent 1px);
+      font-family: Inter, Arial;
+
       height: 100dvh;
+      width: 100dvw;
 
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-
-      background: #1e1e1e;
     }
 
-    #container h1 {
-      color: #fff;
+    h1 {
       margin-bottom: 1rem;
     }
 
-    #container canvas {
+    canvas {
       background: #fff;
+      box-shadow: 0px 0px 20px 0px rgba(0, 0, 0, .05);
+    }
+
+    button {
+      cursor: pointer;
+      border: 0;
+      background: #1d1d1d;
+      color: #fcfcfc;
+      border-radius: .2rem;
+      padding: .5rem .75rem;
+    }
+
+    button:hover {
+      background: #303030;
+    }
+
+    #actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: .5rem;
+      margin-top: 1rem;
     }
   </style>
 </head>
 
 <body>
+  <h1>Graph Editor</h1>
   <div id="container">
-    <h1>Graph Editor</h1>
+  </div>
+  <div id="actions">
+    <button id="reset-graph">RESET</button>
+    <button id="export-graph-svg">EXPORT SVG</button>
+    <button id="export-graph-png">EXPORT PNG</button>
   </div>
   <script src="index.js"></script>
 </body>

@@ -27,7 +27,7 @@ class Point {
 
   draw(ctx) {
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 5, 0, 2 * Math.PI);
+    ctx.arc(this.x, this.y, 4, 0, 2 * Math.PI);
     ctx.fillStyle = this.hovered ? 'red' : this.selected ? 'green' : 'black';
     ctx.fill();
   }
@@ -91,6 +91,11 @@ class Graph {
     this.points.forEach(point => point.draw(ctx));
   }
 
+  reset() {
+    this.segments.length = 0;
+    this.points.length = 0;
+  }
+
   #hasPoint(point) {
     return this.points.find(p => p.isEqual(point));
   }
@@ -144,6 +149,8 @@ class GraphEditor {
 
   draggedElement;
 
+  inlineElement;
+
   constructor(container) {
     this.container = container;
 
@@ -168,6 +175,8 @@ class GraphEditor {
 
     this.draggedElement = null;
 
+    this.inlineElement = null
+
     this.#registerEvents();
   }
 
@@ -184,6 +193,12 @@ class GraphEditor {
     this.canvas.addEventListener('contextmenu', handleContextMenu);
 
     document.addEventListener('keydown', handleKeyDown);
+
+    document.getElementById('reset-graph').addEventListener('click', _ => {
+      this.graph.reset();
+
+      this.render();
+    });
   }
 
   #unregisterEvents() {
@@ -202,7 +217,22 @@ function handleMouseDown(event) {
 
   switch (event.button) {
     case MOUSE_BUTTONS.LEFT_CLICK:
-      if (graphEditor.hoveredElement) {
+      if (!graphEditor.hoveredElement) {
+        const createdPoint = graphEditor.graph.addPoint({ x: mouseX, y: mouseY });
+
+        if (graphEditor.selectedElement) {
+          graphEditor.selectedElement.selected = false;
+
+          graphEditor.graph.addSegment(graphEditor.selectedElement, createdPoint);
+        }
+
+        createdPoint.selected = true;
+        graphEditor.selectedElement = createdPoint;
+
+        graphEditor.render();
+      }
+
+      if (graphEditor.hoveredElement instanceof Point) {
         graphEditor.draggedElement = graphEditor.hoveredElement;
 
         if (!graphEditor.selectedElement) {
@@ -211,39 +241,60 @@ function handleMouseDown(event) {
           graphEditor.selectedElement.selected = true;
 
           graphEditor.render();
-        } else {
-          if (graphEditor.selectedElement !== graphEditor.hoveredElement) {
-            graphEditor.selectedElement.selected = false;
-            graphEditor.hoveredElement.selected = true;
 
-            const segmentAlreadyExists = graphEditor.graph.segments.find(segment => segment.isEqual(graphEditor.selectedElement, graphEditor.hoveredElement))
-
-            if (!segmentAlreadyExists) {
-              graphEditor.graph.addSegment(graphEditor.selectedElement, graphEditor.hoveredElement);
-            }
-
-            graphEditor.selectedElement = graphEditor.hoveredElement
-          } else {
-            graphEditor.selectedElement.selected = false;
-            graphEditor.selectedElement = null;
-          }
+          return;
         }
+
+        if (graphEditor.selectedElement !== graphEditor.hoveredElement) {
+          graphEditor.selectedElement.selected = false;
+          graphEditor.hoveredElement.selected = true;
+
+          const segmentAlreadyExists = graphEditor.graph.segments.find(segment => segment.isEqual(graphEditor.selectedElement, graphEditor.hoveredElement))
+
+          if (!segmentAlreadyExists) graphEditor.graph.addSegment(graphEditor.selectedElement, graphEditor.hoveredElement);
+
+          graphEditor.selectedElement = graphEditor.hoveredElement
+
+          graphEditor.render();
+
+          return;
+        }
+
+        graphEditor.selectedElement.selected = false;
+        graphEditor.selectedElement = null;
+
+        graphEditor.render();
 
         return;
       }
 
-      const createdPoint = graphEditor.graph.addPoint({ x: mouseX, y: mouseY });
+      if (graphEditor.hoveredElement instanceof Segment) {
+        const segment = graphEditor.hoveredElement;
+        const inlinePointPosition = graphEditor.inlineElement;
 
-      if (graphEditor.selectedElement) {
-        graphEditor.selectedElement.selected = false;
+        const inlinePoint = graphEditor.graph.addPoint({ x: inlinePointPosition.x, y: inlinePointPosition.y });
 
-        graphEditor.graph.addSegment(graphEditor.selectedElement, createdPoint)
+        graphEditor.graph.addSegment(segment.point1, inlinePoint);
+        graphEditor.graph.addSegment(segment.point2, inlinePoint);
+
+        graphEditor.graph.removeSegment(segment);
+
+        if (graphEditor.selectedElement) {
+          graphEditor.selectedElement.selected = false;
+
+          graphEditor.graph.addSegment(graphEditor.selectedElement, inlinePoint);
+        }
+
+
+        inlinePoint.selected = true;
+
+        graphEditor.selectedElement = inlinePoint;
+        graphEditor.hoveredElement = inlinePoint;
+
+        graphEditor.render();
+
+        return;
       }
-
-      createdPoint.selected = true;
-      graphEditor.selectedElement = createdPoint;
-
-      graphEditor.render();
 
       break;
     case MOUSE_BUTTONS.RIGHT_CLICK:
@@ -306,8 +357,10 @@ function handleMouseMove(event) {
     if (segment.hovered) segment.hovered = false;
   }
 
-  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graphEditor.graph.points, 5);
-  const [hoveredSegment] = getClosestSegment(mouseX, mouseY, graphEditor.graph.segments, 5);
+  const [hoveredPoint] = getClosestPoint(mouseX, mouseY, graphEditor.graph.points, 4);
+  const [hoveredSegment, distanceToSegment, segmentPoint] = getClosestSegment(mouseX, mouseY, graphEditor.graph.segments, 4);
+
+  graphEditor.inlineElement = segmentPoint && !(graphEditor.hoveredElement instanceof Point) ? segmentPoint : null;
 
   graphEditor.hoveredElement = hoveredPoint || hoveredSegment || null;
   graphEditor.canvas.style.cursor = graphEditor.hoveredElement ? 'pointer' : 'inherit';
@@ -317,13 +370,18 @@ function handleMouseMove(event) {
   graphEditor.render();
 
   if (graphEditor.selectedElement) {
-    graphEditor.render();
-
     graphEditor.ctx.beginPath();
     graphEditor.ctx.setLineDash([5, 5]);
     graphEditor.ctx.moveTo(graphEditor.selectedElement.x, graphEditor.selectedElement.y);
     graphEditor.ctx.lineTo(mouseX, mouseY);
     graphEditor.ctx.stroke();
+  }
+
+  if (graphEditor.inlineElement) {
+    graphEditor.ctx.beginPath();
+    graphEditor.ctx.arc(graphEditor.inlineElement.x, graphEditor.inlineElement.y, 4, 0, 2 * Math.PI);
+    graphEditor.ctx.fillStyle = 'red';
+    graphEditor.ctx.fill();
   }
 }
 
@@ -364,24 +422,39 @@ function getClosestPoint(x, y, points, limit = Number.MAX_SAFE_INTEGER) {
 function getClosestSegment(x, y, segments, limit = Number.MAX_SAFE_INTEGER) {
   let min_distance = Number.MAX_SAFE_INTEGER;
   let closestSegment = null;
+  let closestSegmentPoint = null;
 
   for (const segment of segments) {
-    const distance = getPointDistanceToSegment({ x, y }, segment);
+    const [distance, segmentPoint] = getPointDistanceToSegment({ x, y }, segment);
 
     if (distance < min_distance && distance !== 0 && distance < limit) {
       min_distance = distance;
       closestSegment = segment;
+      closestSegmentPoint = segmentPoint;
     }
   }
 
-  return [closestSegment, min_distance]
+  return [closestSegment, min_distance, closestSegmentPoint]
 }
 
 function getPointDistanceToSegment(point, segment) {
-  const numerator = Math.abs((segment.point2.x - segment.point1.x) * (segment.point1.y - point.y) - (segment.point1.x - point.x) * (segment.point2.y - segment.point1.y));
-  const denominator = Math.sqrt((segment.point2.x - segment.point1.x) ** 2 + (segment.point2.y - segment.point1.y) ** 2);
+  // const numerator = Math.abs((segment.point2.x - segment.point1.x) * (segment.point1.y - point.y) - (segment.point1.x - point.x) * (segment.point2.y - segment.point1.y));
+  // const denominator = Math.sqrt((segment.point2.x - segment.point1.x) ** 2 + (segment.point2.y - segment.point1.y) ** 2);
 
-  return numerator / denominator;
+  // return numerator / denominator;
+  const lineLength = Math.hypot(segment.point2.x - segment.point1.x, segment.point2.y - segment.point1.y);
+  const dot = ((point.x - segment.point1.x) * (segment.point2.x - segment.point1.x) + (point.y - segment.point1.y) * (segment.point2.y - segment.point1.y)) / (lineLength ** 2);
+
+  // Verificação adicional para limitar ao segmento
+  if (dot < 0 || dot > 1) {
+    // O ponto mais próximo está fora do segmento
+    return [Infinity, null];
+  }
+
+  const closestX = segment.point1.x + dot * (segment.point2.x - segment.point1.x);
+  const closestY = segment.point1.y + dot * (segment.point2.y - segment.point1.y);
+
+  return [Math.hypot(closestX - point.x, closestY - point.y), { x: closestX, y: closestY }];
 }
 
 // Application
