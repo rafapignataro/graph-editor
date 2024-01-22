@@ -1,3 +1,10 @@
+// Constants
+const MOUSE_BUTTONS = {
+  LEFT_CLICK: 0,
+  SCROLL_CLICK: 1,
+  RIGHT_CLICK: 2
+};
+
 // Primitives
 class Point {
   x;
@@ -98,6 +105,11 @@ class Graph {
     return point;
   }
 
+  removePoint(point) {
+    this.points = this.points.filter(p => p !== point);
+    this.segments = this.segments.filter(s => !s.hasPoint(point));
+  }
+
   #hasSegment(point1, point2) {
     return this.segments.find(segment => segment.isEqual(point1, point2))
   }
@@ -110,6 +122,10 @@ class Graph {
     this.segments.push(segment);
 
     return segment;
+  }
+
+  removeSegment(segment) {
+    this.segments = this.segments.filter(s => s !== segment);
   }
 }
 
@@ -151,6 +167,8 @@ class GraphEditor {
     this.selectedElement = null;
 
     this.draggedElement = null;
+
+    this.#registerEvents();
   }
 
   render() {
@@ -158,54 +176,109 @@ class GraphEditor {
 
     this.graph.draw(this.ctx);
   }
+
+  #registerEvents() {
+    this.canvas.addEventListener('mousedown', handleMouseDown);
+    this.canvas.addEventListener('mouseup', handleMouseUp);
+    this.canvas.addEventListener('mousemove', handleMouseMove);
+    this.canvas.addEventListener('contextmenu', handleContextMenu);
+
+    document.addEventListener('keydown', handleKeyDown);
+  }
+
+  #unregisterEvents() {
+    this.canvas.removeEventListener('mousedown', handleMouseDown);
+    this.canvas.removeEventListener('mouseup', handleMouseUp);
+    this.canvas.removeEventListener('mousemove', handleMouseMove);
+    this.canvas.removeEventListener('contextmenu', handleContextMenu);
+
+    document.removeEventListener('keydown', handleKeyDown);
+  }
 }
 
 // Events
 function handleMouseDown(event) {
   const { offsetX: mouseX, offsetY: mouseY } = event;
 
-  if (graphEditor.hoveredElement) {
-    graphEditor.draggedElement = graphEditor.hoveredElement;
+  switch (event.button) {
+    case MOUSE_BUTTONS.LEFT_CLICK:
+      if (graphEditor.hoveredElement) {
+        graphEditor.draggedElement = graphEditor.hoveredElement;
 
-    if (!graphEditor.selectedElement) {
-      graphEditor.selectedElement = graphEditor.hoveredElement;
+        if (!graphEditor.selectedElement) {
+          graphEditor.selectedElement = graphEditor.hoveredElement;
 
-      graphEditor.selectedElement.selected = true;
+          graphEditor.selectedElement.selected = true;
 
-      graphEditor.render();
-    } else {
-      if (graphEditor.selectedElement !== graphEditor.hoveredElement) {
-        graphEditor.selectedElement.selected = false;
-        graphEditor.hoveredElement.selected = true;
+          graphEditor.render();
+        } else {
+          if (graphEditor.selectedElement !== graphEditor.hoveredElement) {
+            graphEditor.selectedElement.selected = false;
+            graphEditor.hoveredElement.selected = true;
 
-        const segmentAlreadyExists = graphEditor.graph.segments.find(segment => segment.isEqual(graphEditor.selectedElement, graphEditor.hoveredElement))
+            const segmentAlreadyExists = graphEditor.graph.segments.find(segment => segment.isEqual(graphEditor.selectedElement, graphEditor.hoveredElement))
 
-        if (!segmentAlreadyExists) {
-          graphEditor.graph.addSegment(graphEditor.selectedElement, graphEditor.hoveredElement);
+            if (!segmentAlreadyExists) {
+              graphEditor.graph.addSegment(graphEditor.selectedElement, graphEditor.hoveredElement);
+            }
+
+            graphEditor.selectedElement = graphEditor.hoveredElement
+          } else {
+            graphEditor.selectedElement.selected = false;
+            graphEditor.selectedElement = null;
+          }
         }
 
-        graphEditor.selectedElement = graphEditor.hoveredElement
-      } else {
-        graphEditor.selectedElement.selected = false;
-        graphEditor.selectedElement = null;
+        return;
       }
-    }
 
-    return;
+      const createdPoint = graphEditor.graph.addPoint({ x: mouseX, y: mouseY });
+
+      if (graphEditor.selectedElement) {
+        graphEditor.selectedElement.selected = false;
+
+        graphEditor.graph.addSegment(graphEditor.selectedElement, createdPoint)
+      }
+
+      createdPoint.selected = true;
+      graphEditor.selectedElement = createdPoint;
+
+      graphEditor.render();
+
+      break;
+    case MOUSE_BUTTONS.RIGHT_CLICK:
+      if (!graphEditor.hoveredElement) return;
+
+      if (graphEditor.hoveredElement instanceof Point) {
+        graphEditor.graph.removePoint(graphEditor.hoveredElement);
+
+        if (graphEditor.selectedElement === graphEditor.hoveredElement) graphEditor.selectedElement = null;
+
+        graphEditor.hoveredElement = null;
+
+        graphEditor.render();
+
+        return;
+      }
+
+      if (graphEditor.hoveredElement instanceof Segment) {
+        graphEditor.graph.removeSegment(graphEditor.hoveredElement);
+
+        if (graphEditor.selectedElement === graphEditor.hoveredElement) graphEditor.selectedElement = null;
+
+        graphEditor.hoveredElement = null;
+
+        graphEditor.render();
+
+        return;
+      }
+
+      break;
+    case MOUSE_BUTTONS.SCROLL_CLICK:
+      break;
+    default:
+      break;
   }
-
-  const createdPoint = graphEditor.graph.addPoint({ x: mouseX, y: mouseY });
-
-  if (graphEditor.selectedElement) {
-    graphEditor.selectedElement.selected = false;
-
-    graphEditor.graph.addSegment(graphEditor.selectedElement, createdPoint)
-  }
-
-  createdPoint.selected = true;
-  graphEditor.selectedElement = createdPoint;
-
-  graphEditor.render();
 }
 
 function handleMouseUp() {
@@ -267,6 +340,10 @@ function handleKeyDown(event) {
   }
 }
 
+function handleContextMenu(event) {
+  event.preventDefault();
+}
+
 // Utils
 function getClosestPoint(x, y, points, limit = Number.MAX_SAFE_INTEGER) {
   let min_distance = Number.MAX_SAFE_INTEGER;
@@ -311,9 +388,3 @@ function getPointDistanceToSegment(point, segment) {
 const container = document.getElementById('container');
 
 const graphEditor = new GraphEditor(container);
-
-graphEditor.canvas.addEventListener('mousedown', handleMouseDown);
-graphEditor.canvas.addEventListener('mouseup', handleMouseUp);
-graphEditor.canvas.addEventListener('mousemove', handleMouseMove);
-document.addEventListener('keydown', handleKeyDown);
-graphEditor.canvas.addEventListener('contextmenu', event => event.preventDefault());
