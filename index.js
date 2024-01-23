@@ -25,10 +25,10 @@ class Point {
     this.hovered = false;
   }
 
-  draw(ctx) {
+  draw(ctx, { color = null }) {
     ctx.beginPath();
     ctx.arc(this.x, this.y, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = this.hovered ? 'red' : this.selected ? 'green' : 'black';
+    ctx.fillStyle = color || (this.hovered ? '#e74c3c' : this.selected ? '#2ecc71' : '#1d1d1d');
     ctx.fill();
   }
 
@@ -56,14 +56,14 @@ class Segment {
     this.hovered = false;
   }
 
-  draw(ctx) {
+  draw(ctx, { dashed = null, color = null }) {
     ctx.beginPath();
-    ctx.setLineDash([]);
+    ctx.setLineDash(dashed || []);
     ctx.moveTo(this.point1.x, this.point1.y);
     ctx.lineTo(this.point2.x, this.point2.y);
-    ctx.strokeStyle = this.hovered ? 'red' : this.selected ? 'green' : 'black';
+    ctx.strokeStyle = color || (this.hovered ? '#e74c3c' : this.selected ? '#2ecc71' : '#1d1d1d');
     ctx.stroke();
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = '#1d1d1d';
   }
 
   isEqual(point1, point2) {
@@ -86,9 +86,9 @@ class Graph {
     this.segments = segments;
   }
 
-  draw(ctx) {
-    this.segments.forEach(segment => segment.draw(ctx));
-    this.points.forEach(point => point.draw(ctx));
+  draw(ctx, viewport) {
+    this.segments.forEach(segment => segment.draw(ctx, viewport));
+    this.points.forEach(point => point.draw(ctx, viewport));
   }
 
   reset() {
@@ -143,6 +143,8 @@ class GraphEditor {
 
   graph;
 
+  viewport;
+
   hoveredElement;
 
   selectedElement;
@@ -169,6 +171,8 @@ class GraphEditor {
 
     this.graph = new Graph();
 
+    this.viewport = new ViewPort(this.canvas, this.ctx);
+
     this.hoveredElement = null;
 
     this.selectedElement = null;
@@ -181,9 +185,9 @@ class GraphEditor {
   }
 
   render() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.viewport.reset();
 
-    this.graph.draw(this.ctx);
+    this.graph.draw(this.ctx, this.viewport);
   }
 
   #registerEvents() {
@@ -191,13 +195,18 @@ class GraphEditor {
     this.canvas.addEventListener('mouseup', handleMouseUp);
     this.canvas.addEventListener('mousemove', handleMouseMove);
     this.canvas.addEventListener('contextmenu', handleContextMenu);
+    this.canvas.addEventListener('wheel', handleScroll);
 
     document.addEventListener('keydown', handleKeyDown);
 
-    document.getElementById('reset-graph').addEventListener('click', _ => {
+    document.getElementById('reset-graph')?.addEventListener('click', _ => {
       this.graph.reset();
 
       this.render();
+    });
+
+    document.getElementById('export-graph-svg')?.addEventListener('click', _ => {
+      console.log(this.exportToSvg());
     });
   }
 
@@ -206,14 +215,160 @@ class GraphEditor {
     this.canvas.removeEventListener('mouseup', handleMouseUp);
     this.canvas.removeEventListener('mousemove', handleMouseMove);
     this.canvas.removeEventListener('contextmenu', handleContextMenu);
+    this.canvas.removeEventListener('wheel', handleScroll);
 
     document.removeEventListener('keydown', handleKeyDown);
   }
+
+  exportToSvg() {
+    let svgContent = '';
+
+    this.graph.points.forEach(point => svgContent += `<circle cx="${point.x}" cy="${point.y}" r="5" fill="#1d1d1d" />`);
+    this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x}" y1="${segment.point1.y}" x2="${segment.point2.x}" y2="${segment.point2.y}" stroke="#1d1d1d" />`);
+
+    return `
+      <svg width="600" height="600" xmlns="http://www.w3.org/2000/svg">
+        ${svgContent}
+      </svg>;
+    `
+  }
+}
+
+class ViewPort {
+  canvas;
+
+  ctx;
+
+  zoom;
+
+  offset;
+
+  center;
+
+  drag;
+
+  constructor(canvas, ctx) {
+    this.canvas = canvas;
+
+    this.ctx = ctx;
+
+    this.zoom = 1;
+
+    this.center = {
+      x: this.canvas.width / 2,
+      y: this.canvas.height / 2
+    }
+
+    this.offset = {
+      x: -this.center.x,
+      y: -this.center.y
+    }
+
+    this.drag = {
+      start: {
+        x: 0,
+        y: 0
+      },
+      end: {
+        x: 0,
+        y: 0
+      },
+      offset: {
+        x: 0,
+        y: 0
+      },
+      active: false
+    }
+
+    this.#registerEvents();
+  }
+
+  getMousePosition(event, dragging = false) {
+    const position = {
+      x: (event.offsetX - this.center.x) * this.zoom - this.offset.x,
+      y: (event.offsetY - this.center.y) * this.zoom - this.offset.y,
+    };
+
+    if (!dragging) return position;
+
+    return {
+      x: position.x - this.drag.offset.x,
+      y: position.y - this.drag.offset.y
+    }
+  }
+
+  reset() {
+    this.ctx.restore();
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.ctx.save();
+
+    this.ctx.translate(this.center.x, this.center.y);
+
+    this.ctx.scale(1 / this.zoom, 1 / this.zoom);
+
+    this.ctx.translate(this.offset.x + this.drag.offset.x, this.offset.y + this.drag.offset.y);
+  }
+
+  #registerEvents() {
+    this.canvas.addEventListener('mousedown', this.#handleMouseDown.bind(this));
+    this.canvas.addEventListener('mousemove', this.#handleMouseMove.bind(this));
+    this.canvas.addEventListener('mouseup', this.#handleMouseUp.bind(this));
+  }
+
+  #unregisterEvents() {
+    this.canvas.removeEventListener('mousedown', this.#handleMouseDown.bind(this));
+    this.canvas.removeEventListener('mousemove', this.#handleMouseMove.bind(this));
+    this.canvas.removeEventListener('mouseup', this.#handleMouseUp.bind(this));
+  }
+
+  #handleMouseDown(event) {
+    if (event.button !== MOUSE_BUTTONS.SCROLL_CLICK) return;
+
+    this.drag.start = this.getMousePosition(event);
+    this.drag.active = true;
+  }
+
+  #handleMouseMove(event) {
+    if (!this.drag.active) return;
+
+    this.drag.end = this.getMousePosition(event);
+    this.drag.offset = {
+      x: this.drag.end.x - this.drag.start.x,
+      y: this.drag.end.y - this.drag.start.y,
+    }
+  }
+
+  #handleMouseUp() {
+    if (!this.drag.active) return;
+
+    this.offset = {
+      x: this.offset.x + this.drag.offset.x,
+      y: this.offset.y + this.drag.offset.y,
+    };
+    this.drag = {
+      start: {
+        x: 0,
+        y: 0
+      },
+      end: {
+        x: 0,
+        y: 0
+      },
+      offset: {
+        x: 0,
+        y: 0
+      },
+      active: false
+    }
+  }
+
 }
 
 // Events
 function handleMouseDown(event) {
-  const { offsetX: mouseX, offsetY: mouseY } = event;
+  const { x: mouseX, y: mouseY } = graphEditor.viewport.getMousePosition(event);
 
   switch (event.button) {
     case MOUSE_BUTTONS.LEFT_CLICK:
@@ -332,12 +487,8 @@ function handleMouseDown(event) {
   }
 }
 
-function handleMouseUp() {
-  graphEditor.draggedElement = null;
-}
-
 function handleMouseMove(event) {
-  const { offsetX: mouseX, offsetY: mouseY } = event;
+  const { x: mouseX, y: mouseY } = graphEditor.viewport.getMousePosition(event, true);
 
   if (graphEditor.draggedElement) {
     graphEditor.canvas.style.cursor = 'grabbing';
@@ -370,19 +521,23 @@ function handleMouseMove(event) {
   graphEditor.render();
 
   if (graphEditor.selectedElement) {
-    graphEditor.ctx.beginPath();
-    graphEditor.ctx.setLineDash([5, 5]);
-    graphEditor.ctx.moveTo(graphEditor.selectedElement.x, graphEditor.selectedElement.y);
-    graphEditor.ctx.lineTo(mouseX, mouseY);
-    graphEditor.ctx.stroke();
+    const from = graphEditor.selectedElement;
+    let to = { x: mouseX, y: mouseY };
+
+    const isHoveringPoint = graphEditor.hoveredElement && graphEditor.hoveredElement !== graphEditor.selectedElement && graphEditor.hoveredElement instanceof Point;
+
+    if (isHoveringPoint) to = graphEditor.hoveredElement;
+
+    new Segment({ point1: from, point2: to }).draw(graphEditor.ctx, { dashed: [5, 5] });
   }
 
   if (graphEditor.inlineElement) {
-    graphEditor.ctx.beginPath();
-    graphEditor.ctx.arc(graphEditor.inlineElement.x, graphEditor.inlineElement.y, 4, 0, 2 * Math.PI);
-    graphEditor.ctx.fillStyle = 'red';
-    graphEditor.ctx.fill();
+    new Point(graphEditor.inlineElement).draw(graphEditor.ctx, { color: '#e74c3c' });
   }
+}
+
+function handleMouseUp() {
+  graphEditor.draggedElement = null;
 }
 
 function handleKeyDown(event) {
@@ -400,6 +555,22 @@ function handleKeyDown(event) {
 
 function handleContextMenu(event) {
   event.preventDefault();
+}
+
+function handleScroll(event) {
+  event.preventDefault();
+
+  const { x: mouseX, y: mouseY } = graphEditor.viewport.getMousePosition(event);
+
+  const direction = Math.sign(event.deltaY);
+
+  graphEditor.viewport.zoom += direction * 0.1;
+  graphEditor.viewport.zoom = Math.max(1, Math.min(10, graphEditor.viewport.zoom));
+
+  // // Ajustar o offset com base na posição do mouse
+  // graphEditor.offset.x -= (mouseX - graphEditor.offset.x) * (1 - currentZoom / graphEditor.zoom);
+  // graphEditor.offset.y -= (mouseY - graphEditor.offset.y) * (1 - currentZoom / graphEditor.zoom);
+  graphEditor.render();
 }
 
 // Utils
