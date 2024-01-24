@@ -11,6 +11,12 @@ const ZOOM = {
   step: 0.1
 }
 
+const COLORS = {
+  selected: '#e74c3c',
+  hovered: '#2ecc71',
+  default: '#1d1d1d'
+}
+
 // Primitives
 class Point {
   x;
@@ -34,7 +40,7 @@ class Point {
   draw(ctx, { color = null }) {
     ctx.beginPath();
     ctx.arc(this.x, this.y, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = color || (this.hovered ? '#e74c3c' : this.selected ? '#2ecc71' : '#1d1d1d');
+    ctx.fillStyle = color || (this.hovered ? COLORS.selected : this.selected ? COLORS.hovered : COLORS.default);
     ctx.fill();
   }
 
@@ -67,9 +73,9 @@ class Segment {
     ctx.setLineDash(dashed || []);
     ctx.moveTo(this.point1.x, this.point1.y);
     ctx.lineTo(this.point2.x, this.point2.y);
-    ctx.strokeStyle = color || (this.hovered ? '#e74c3c' : this.selected ? '#2ecc71' : '#1d1d1d');
+    ctx.strokeStyle = color || (this.hovered ? COLORS.selected : this.selected ? COLORS.hovered : COLORS.default);
     ctx.stroke();
-    ctx.strokeStyle = '#1d1d1d';
+    ctx.strokeStyle = COLORS.default;
   }
 
   isEqual(point1, point2) {
@@ -199,10 +205,7 @@ class GraphEditor {
   }
 
   #registerEvents() {
-    window.addEventListener('resize', _ => {
-      this.canvas.width = window.innerWidth;
-      this.canvas.height = window.innerHeight;
-    });
+    window.addEventListener('resize', this.#handleResize.bind(this));
     this.canvas.addEventListener('mousedown', this.#handleMouseDown.bind(this));
     this.canvas.addEventListener('mouseup', this.#handleMouseUp.bind(this));
     this.canvas.addEventListener('mousemove', this.#handleMouseMove.bind(this));
@@ -232,7 +235,7 @@ class GraphEditor {
     });
 
     document.getElementById('export-graph-svg')?.addEventListener('click', _ => {
-      console.info('SVG: ', this.exportToSvg());
+      this.exportToSvg();
     });
   }
 
@@ -244,19 +247,22 @@ class GraphEditor {
     this.canvas.removeEventListener('wheel', this.#handleScroll);
 
     document.removeEventListener('keydown', this.#handleKeyDown);
+
+    window.removeEventListener('resize', this.#handleResize);
   }
 
   exportToSvg() {
     let svgContent = '';
 
-    this.graph.points.forEach(point => svgContent += `<circle cx="${point.x}" cy="${point.y}" r="5" fill="#1d1d1d" />`);
-    this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x}" y1="${segment.point1.y}" x2="${segment.point2.x}" y2="${segment.point2.y}" stroke="#1d1d1d" />`);
+    this.graph.points.forEach(point => svgContent += `<circle cx="${point.x}" cy="${point.y}" r="5" fill="${COLORS.default}" />`);
+    this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x}" y1="${segment.point1.y}" x2="${segment.point2.x}" y2="${segment.point2.y}" stroke="${COLORS.default}" />`);
 
-    return `
-      <svg width="600" height="600" xmlns="http://www.w3.org/2000/svg">
+    const svgString = `
+      <svg width="${window.innerWidth}" height="${window.innerHeight}" xmlns="http://www.w3.org/2000/svg">
         ${svgContent}
-      </svg>;
+      </svg>
     `
+    downloadSvg(svgString);
   }
 
   // Events
@@ -429,7 +435,7 @@ class GraphEditor {
     }
 
     if (this.inlineElement) {
-      new Point(this.inlineElement).draw(this.ctx, { color: '#e74c3c' });
+      new Point(this.inlineElement).draw(this.ctx, { color: COLORS.selected });
     }
   }
 
@@ -462,6 +468,13 @@ class GraphEditor {
 
     this.viewport.zoom += direction * 0.1;
     this.viewport.zoom = limitZoomRange(this.viewport.zoom);
+
+    this.render();
+  }
+
+  #handleResize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
 
     this.render();
   }
@@ -642,6 +655,20 @@ function getClosestSegment(x, y, segments, limit = Number.MAX_SAFE_INTEGER) {
 
 function limitZoomRange(zoom) {
   return Math.max(ZOOM.from, Math.min(ZOOM.to, zoom))
+}
+
+function downloadSvg(svgString, fileName = 'graph') {
+  const blob = new Blob([svgString.trim()], { type: 'image/svg+xml;charset=utf-8' });
+
+  const url = URL.createObjectURL(blob);
+
+  const downloadLink = document.createElement('a');
+  downloadLink.href = url;
+  downloadLink.download = fileName;
+
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
 }
 
 // Math
