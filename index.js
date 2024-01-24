@@ -164,8 +164,8 @@ class GraphEditor {
 
     const canvas = document.createElement('canvas');
 
-    canvas.width = 600;
-    canvas.height = 600;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     this.canvas = canvas;
 
@@ -199,6 +199,10 @@ class GraphEditor {
   }
 
   #registerEvents() {
+    window.addEventListener('resize', _ => {
+      this.canvas.width = window.innerWidth;
+      this.canvas.height = window.innerHeight;
+    });
     this.canvas.addEventListener('mousedown', this.#handleMouseDown.bind(this));
     this.canvas.addEventListener('mouseup', this.#handleMouseUp.bind(this));
     this.canvas.addEventListener('mousemove', this.#handleMouseMove.bind(this));
@@ -228,7 +232,7 @@ class GraphEditor {
     });
 
     document.getElementById('export-graph-svg')?.addEventListener('click', _ => {
-      console.log(this.exportToSvg());
+      console.info('SVG: ', this.exportToSvg());
     });
   }
 
