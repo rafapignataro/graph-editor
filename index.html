@@ -52,6 +52,28 @@
       background: #303030;
     }
 
+    #container {
+      position: relative;
+    }
+
+    #zoom-container {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+
+      display: flex;
+      align-items: center;
+    }
+
+    #zoom-container button {
+      padding: .5rem 1rem;
+    }
+
+    #zoom-value {
+      width: 48px;
+      text-align: center;
+    }
+
     #actions {
       display: flex;
       justify-content: center;
@@ -65,6 +87,11 @@
 <body>
   <h1>Graph Editor</h1>
   <div id="container">
+    <div id="zoom-container">
+      <button id="increase-zoom">+</button>
+      <span id="zoom-value"></span>
+      <button id="decrease-zoom">-</button>
+    </div>
   </div>
   <div id="actions">
     <button id="reset-graph">RESET</button>

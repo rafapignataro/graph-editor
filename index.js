@@ -188,6 +188,8 @@ class GraphEditor {
     this.viewport.reset();
 
     this.graph.draw(this.ctx, this.viewport);
+
+    document.getElementById('zoom-value').innerHTML = `${((this.viewport.zoom - 0.5) / (5 - 0.5) * 100).toFixed(0)}%`;
   }
 
   #registerEvents() {
@@ -201,6 +203,20 @@ class GraphEditor {
 
     document.getElementById('reset-graph')?.addEventListener('click', _ => {
       this.graph.reset();
+
+      this.render();
+    });
+
+    document.getElementById('increase-zoom')?.addEventListener('click', _ => {
+      this.viewport.zoom += 0.1;
+      this.viewport.zoom = Math.max(0.5, Math.min(5, this.viewport.zoom));
+
+      this.render();
+    });
+
+    document.getElementById('decrease-zoom')?.addEventListener('click', _ => {
+      this.viewport.zoom -= 0.1;
+      this.viewport.zoom = Math.max(0.5, Math.min(5, this.viewport.zoom));
 
       this.render();
     });
@@ -565,7 +581,7 @@ function handleScroll(event) {
   const direction = Math.sign(event.deltaY);
 
   graphEditor.viewport.zoom += direction * 0.1;
-  graphEditor.viewport.zoom = Math.max(1, Math.min(10, graphEditor.viewport.zoom));
+  graphEditor.viewport.zoom = Math.max(0.5, Math.min(5, graphEditor.viewport.zoom));
 
   // // Ajustar o offset com base na posição do mouse
   // graphEditor.offset.x -= (mouseX - graphEditor.offset.x) * (1 - currentZoom / graphEditor.zoom);
