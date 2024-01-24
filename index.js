@@ -203,6 +203,17 @@ class GraphEditor {
 
     this.graph.draw(this.ctx, this.viewport);
 
+    const boundaries = getGraphBoundaries(this.graph, 50);
+
+    if (boundaries) {
+      this.ctx.setLineDash([5, 5]);
+      this.ctx.strokeStyle = COLORS.idle;
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(boundaries.x, boundaries.y, boundaries.width, boundaries.height);
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeStyle = COLORS.default;
+    }
+
     document.getElementById('zoom-value').innerHTML = `${100 - ((this.viewport.zoom - ZOOM.from) / (ZOOM.to - ZOOM.from) * 100).toFixed(0)}%`;
   }
 
@@ -617,7 +628,6 @@ class ViewPort {
       active: false
     }
   }
-
 }
 
 // Utils
@@ -657,6 +667,38 @@ function getClosestSegment(x, y, segments, limit = Number.MAX_SAFE_INTEGER) {
 
 function limitZoomRange(zoom) {
   return Math.max(ZOOM.from, Math.min(ZOOM.to, zoom))
+}
+
+function getGraphBoundaries(graph, padding = 0) {
+  if (!graph.segments.length) return null;
+
+  let minX = Number.MAX_SAFE_INTEGER;
+  let maxX = Number.MIN_SAFE_INTEGER;
+  let minY = Number.MAX_SAFE_INTEGER;
+  let maxY = Number.MIN_SAFE_INTEGER;
+
+  for (const segment of graph.segments) {
+    const point1 = segment.point1;
+
+    if (point1.x < minX) minX = point1.x;
+    if (point1.x > maxX) maxX = point1.x;
+    if (point1.y < minY) minY = point1.y;
+    if (point1.y > maxY) maxY = point1.y;
+
+    const point2 = segment.point2;
+
+    if (point2.x < minX) minX = point2.x;
+    if (point2.x > maxX) maxX = point2.x;
+    if (point2.y < minY) minY = point2.y;
+    if (point2.y > maxY) maxY = point2.y;
+  }
+
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: (maxX - minX) + (padding * 2),
+    height: (maxY - minY) + (padding * 2),
+  }
 }
 
 function downloadSvg(svgString, fileName = 'graph') {
