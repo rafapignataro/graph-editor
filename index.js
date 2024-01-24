@@ -14,7 +14,8 @@ const ZOOM = {
 const COLORS = {
   selected: '#e74c3c',
   hovered: '#2ecc71',
-  default: '#1d1d1d'
+  default: '#1d1d1d',
+  idle: '#b5b5b5'
 }
 
 // Primitives
@@ -74,6 +75,7 @@ class Segment {
     ctx.moveTo(this.point1.x, this.point1.y);
     ctx.lineTo(this.point2.x, this.point2.y);
     ctx.strokeStyle = color || (this.hovered ? COLORS.selected : this.selected ? COLORS.hovered : COLORS.default);
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.strokeStyle = COLORS.default;
   }
@@ -431,7 +433,7 @@ class GraphEditor {
 
       if (isHoveringPoint) to = this.hoveredElement;
 
-      new Segment({ point1: from, point2: to }).draw(this.ctx, { dashed: [5, 5] });
+      new Segment({ point1: from, point2: to }).draw(this.ctx, { dashed: [5, 5], color: COLORS.idle });
     }
 
     if (this.inlineElement) {
