@@ -267,11 +267,15 @@ class GraphEditor {
   exportToSvg() {
     let svgContent = '';
 
-    this.graph.points.forEach(point => svgContent += `<circle cx="${point.x}" cy="${point.y}" r="5" fill="${COLORS.default}" />`);
-    this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x}" y1="${segment.point1.y}" x2="${segment.point2.x}" y2="${segment.point2.y}" stroke="${COLORS.default}" />`);
+    const boundaries = getGraphBoundaries(this.graph, 50);
+
+    if (!boundaries) return;
+
+    this.graph.points.forEach(point => svgContent += `<circle cx="${point.x - boundaries.x}" cy="${point.y - boundaries.y}" r="1" fill="${COLORS.default}" />`);
+    this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x - boundaries.x}" y1="${segment.point1.y - boundaries.y}" x2="${segment.point2.x - boundaries.x}" y2="${segment.point2.y - boundaries.y}" stroke="${COLORS.default}" stroke-width="3" />`);
 
     const svgString = `
-      <svg width="${window.innerWidth}" height="${window.innerHeight}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${boundaries.width}" height="${boundaries.height}" xmlns="http://www.w3.org/2000/svg">
         ${svgContent}
       </svg>
     `
