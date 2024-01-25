@@ -275,7 +275,7 @@ class GraphEditor {
     this.graph.segments.forEach(segment => svgContent += `<line x1="${segment.point1.x - boundaries.x}" y1="${segment.point1.y - boundaries.y}" x2="${segment.point2.x - boundaries.x}" y2="${segment.point2.y - boundaries.y}" stroke="${COLORS.default}" stroke-width="3" />`);
 
     const svgString = `
-      <svg width="${boundaries.width}" height="${boundaries.height}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${boundaries.width}" height="${boundaries.height}" viewBox="0 0 ${boundaries.width} ${boundaries.height}" xmlns="http://www.w3.org/2000/svg">
         ${svgContent}
       </svg>
     `
