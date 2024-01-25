@@ -2,6 +2,8 @@
 
 Minimalistic Graph/Vector Editor. Export result to SVG
 
+![demo](https://github.com/rafapignataro/graph-editor/assets/16678782/8f170274-5f96-4738-aa9c-b9689ced6248)
+
 ## How to use 🚀
 
 ### 1. Clone the repository
