@@ -495,7 +495,7 @@ class GraphEditor {
     };
 
     // IS HOVERING POINT
-    const [hoveredPoint] = getClosestPoint(this.drawingPoint, this.graph.points, 4 * this.viewport.zoom);
+    const [hoveredPoint] = getClosestPoint(this.drawingPoint, this.graph.points, 8 * this.viewport.zoom);
 
     if (hoveredPoint) {
       this.canvas.style.cursor = 'pointer';
@@ -543,7 +543,7 @@ class GraphEditor {
     }
 
     // IS HOVERING SEGMENT
-    const [hoveredSegment, hoveredSegmentDistance, segmentPoint] = getClosestSegment(this.drawingPoint, this.graph.segments, 4 * this.viewport.zoom);
+    const [hoveredSegment, hoveredSegmentDistance, segmentPoint] = getClosestSegment(this.drawingPoint, this.graph.segments, 8 * this.viewport.zoom);
 
     if (hoveredSegment) {
       this.canvas.style.cursor = 'pointer';
