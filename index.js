@@ -54,6 +54,18 @@ class Point {
   isEqual(point) {
     return this.x === point.x && this.y === point.y;
   }
+
+  setPosition({ x, y }) {
+    this.x = x;
+    this.y = y;
+  }
+
+  getPosition() {
+    return {
+      x: this.x,
+      y: this.y
+    }
+  }
 }
 
 class Segment {
@@ -171,9 +183,9 @@ class GraphEditor {
 
   selectedElement;
 
-  draggedElement;
+  draggingPoint;
 
-  pressingKeys;
+  alignMode;
 
   constructor(container) {
     this.container = container;
@@ -201,11 +213,9 @@ class GraphEditor {
 
     this.selectedElement = null;
 
-    this.draggedElement = null;
+    this.draggingPoint = null;
 
-    this.pressingKeys = {
-      shift: false
-    };
+    this.alignMode = false;
 
     this.#registerEvents();
   }
@@ -297,6 +307,20 @@ class GraphEditor {
     downloadSvg(svgString);
   }
 
+  drawGuideLine(from, to) {
+    new Segment({
+      point1: from,
+      point2: to
+    }).draw(this.ctx, { color: COLORS.selected });
+  }
+
+  drawHelperLine(from, to) {
+    new Segment({
+      point1: from,
+      point2: to
+    }).draw(this.ctx, { dashed: [5, 5], color: COLORS.selected });
+  }
+
   // Events
   #handleMouseDown(event) {
     const { x: mouseX, y: mouseY } = this.viewport.getMousePosition(event);
@@ -304,7 +328,7 @@ class GraphEditor {
     switch (event.button) {
       case MOUSE_BUTTONS.LEFT_CLICK:
         if (!this.hoveredElement) {
-          const createdPoint = this.graph.addPoint({ x: this.drawingPoint.x, y: this.drawingPoint.y });
+          const createdPoint = this.graph.addPoint(this.drawingPoint.getPosition());
 
           if (this.selectedElement) {
             this.selectedElement.selected = false;
@@ -316,10 +340,12 @@ class GraphEditor {
           this.selectedElement = createdPoint;
 
           this.render();
+
+          return;
         }
 
         if (this.hoveredElement instanceof Point) {
-          this.draggedElement = this.hoveredElement;
+          this.draggingPoint = this.hoveredElement;
 
           if (!this.selectedElement) {
             this.selectedElement = this.hoveredElement;
@@ -340,7 +366,7 @@ class GraphEditor {
             return;
           }
 
-          if (this.pressingKeys.shift) {
+          if (this.alignMode) {
             this.selectedElement.selected = false;
 
             let point = this.graph.points.find(point => point.isEqual(this.drawingPoint));
@@ -378,7 +404,7 @@ class GraphEditor {
         if (this.hoveredElement instanceof Segment) {
           const segment = this.hoveredElement;
 
-          const inlinePoint = this.graph.addPoint({ x: this.drawingPoint.x, y: this.drawingPoint.y });
+          const inlinePoint = this.graph.addPoint(this.drawingPoint.getPosition());
 
           this.graph.addSegment(segment.point1, inlinePoint);
           this.graph.addSegment(segment.point2, inlinePoint);
@@ -390,7 +416,6 @@ class GraphEditor {
 
             this.graph.addSegment(this.selectedElement, inlinePoint);
           }
-
 
           inlinePoint.selected = true;
 
@@ -440,23 +465,16 @@ class GraphEditor {
 
   #handleMouseMove(event) {
     this.render();
+
     const { x: mouseX, y: mouseY } = this.viewport.getMousePosition(event, true);
 
     this.drawingPoint.x = mouseX;
     this.drawingPoint.y = mouseY;
-    this.drawingPoint.visible = true;
+    this.drawingPoint.selected = false;
 
-    if (this.draggedElement) {
-      this.canvas.style.cursor = 'grabbing';
+    this.canvas.style.cursor = 'inherit';
 
-      this.draggedElement.x = mouseX;
-      this.draggedElement.y = mouseY;
-
-      this.drawingPoint.visible = false;
-
-      this.render();
-      return;
-    };
+    this.hoveredElement = null;
 
     for (const point of this.graph.points) {
       if (point.hovered) point.hovered = false;
@@ -466,102 +484,151 @@ class GraphEditor {
       if (segment.hovered) segment.hovered = false;
     }
 
-    const [hoveredPoint, hoveredPointDistance] = getClosestPoint({ x: mouseX, y: mouseY }, this.graph.points, 4 * this.viewport.zoom);
-    const [hoveredSegment, hoveredSegmentDistance, segmentPoint] = getClosestSegment({ x: mouseX, y: mouseY }, this.graph.segments, 4 * this.viewport.zoom);
+    // IS DRAGGING POINT
+    if (this.draggingPoint) {
+      this.canvas.style.cursor = 'grabbing';
 
-    this.canvas.style.cursor = 'inherit';
+      this.draggingPoint.setPosition(this.drawingPoint);
 
-    this.hoveredElement = hoveredPoint || hoveredSegment || null;
-    this.drawingPoint.selected = !!this.hoveredElement;
+      this.render();
+      return;
+    };
 
-    if (this.hoveredElement) {
+    // IS HOVERING POINT
+    const [hoveredPoint] = getClosestPoint(this.drawingPoint, this.graph.points, 4 * this.viewport.zoom);
+
+    if (hoveredPoint) {
       this.canvas.style.cursor = 'pointer';
+
+      this.hoveredElement = hoveredPoint;
       this.hoveredElement.hovered = true;
+      this.drawingPoint.selected = true;
+      this.drawingPoint.setPosition(this.hoveredElement);
 
-      if (this.hoveredElement instanceof Point) {
-        this.drawingPoint.x = this.hoveredElement.x;
-        this.drawingPoint.y = this.hoveredElement.y;
-      }
+      this.render();
 
-      if (this.hoveredElement instanceof Segment) {
-        this.drawingPoint.x = segmentPoint.x;
-        this.drawingPoint.y = segmentPoint.y;
-      }
-    }
+      if (!this.selectedElement) return;
 
-    this.render();
-
-    if (this.selectedElement) {
-      const from = { x: this.selectedElement.x, y: this.selectedElement.y };
-      let to = { x: this.drawingPoint.x, y: this.drawingPoint.y };
-
-      const isHoveringPoint = this.hoveredElement && this.hoveredElement !== this.selectedElement;
-
-      if (this.pressingKeys.shift) {
-        let direction;
+      if (this.alignMode) {
+        const from = this.selectedElement.getPosition();
+        const to = this.drawingPoint.getPosition();
 
         const xDifference = Math.abs(to.x - from.x);
         const yDifference = Math.abs(to.y - from.y);
 
         if (xDifference > yDifference) {
-          direction = 'y';
-
           to.y = from.y;
-          this.drawingPoint.y = from.y;
+
+          this.drawingPoint.y = to.y;
           this.drawingPoint.x = to.x;
         } else {
-          direction = 'x';
           to.x = from.x;
-          this.drawingPoint.x = from.x;
+
+          this.drawingPoint.x = to.x;
           this.drawingPoint.y = to.y;
         }
 
         this.render();
 
-        if (
-          this.hoveredElement &&
-          !(this.hoveredElement.x === this.drawingPoint.x && this.hoveredElement.y === this.drawingPoint.y)
-        ) {
-          if (this.hoveredElement instanceof Point) {
-            if (direction === 'x') {
-              this.drawingPoint.x = from.x;
-              this.drawingPoint.y = to.y;
-            } else {
-              this.drawingPoint.y = from.y;
-              this.drawingPoint.x = to.x;
-            }
+        this.drawGuideLine(this.selectedElement, this.drawingPoint);
 
-            this.render();
+        this.drawHelperLine(this.hoveredElement, this.drawingPoint);
 
-            new Segment({ point1: this.drawingPoint, point2: this.hoveredElement }).draw(this.ctx, { dashed: [5, 5], color: COLORS.selected });
-          }
-
-          // if (this.hoveredElement instanceof Segment) {
-          //   this.drawingPoint.y = from.y;
-          //   this.drawingPoint.x = to.x;
-          // }
-        }
+        return;
       }
 
-      new Segment({ point1: from, point2: to }).draw(this.ctx, { dashed: [5, 5], color: COLORS.selected });
+      this.drawGuideLine(this.selectedElement, this.drawingPoint);
+
+      return;
     }
+
+    // IS HOVERING SEGMENT
+    const [hoveredSegment, hoveredSegmentDistance, segmentPoint] = getClosestSegment(this.drawingPoint, this.graph.segments, 4 * this.viewport.zoom);
+
+    if (hoveredSegment) {
+      this.canvas.style.cursor = 'pointer';
+
+      this.hoveredElement = hoveredSegment;
+      this.hoveredElement.hovered = true;
+      this.drawingPoint.selected = true;
+      this.drawingPoint.setPosition(segmentPoint);
+
+      this.render();
+
+      if (!this.selectedElement) return;
+
+      if (this.alignMode) {
+        const direction =
+          Math.abs(this.drawingPoint.x - this.selectedElement.x) > Math.abs(this.drawingPoint.y - this.selectedElement.y) ?
+            'x' : 'y';
+
+        if (direction === 'x') {
+          this.drawingPoint.y = this.selectedElement.y;
+        } else {
+          this.drawingPoint.x = this.selectedElement.x;
+        }
+
+        console.log(this.drawingPoint.isEqual(segmentPoint))
+
+        this.render();
+
+        this.drawGuideLine(this.selectedElement, this.drawingPoint);
+
+        return;
+      }
+
+      this.drawGuideLine(this.selectedElement, this.drawingPoint);
+
+      return;
+    }
+
+    if (!this.selectedElement) return;
+
+    if (this.alignMode) {
+      const from = this.selectedElement.getPosition();
+      const to = this.drawingPoint.getPosition();
+
+      const xDifference = Math.abs(to.x - from.x);
+      const yDifference = Math.abs(to.y - from.y);
+
+      if (xDifference > yDifference) {
+        to.y = from.y;
+
+        this.drawingPoint.y = to.y;
+      } else {
+        to.x = from.x;
+
+        this.drawingPoint.x = to.x;
+      }
+
+      this.drawGuideLine(from, to);
+
+      return;
+    }
+
+    this.drawGuideLine(this.selectedElement, this.drawingPoint);
+
+    return;
   }
 
   #handleMouseUp() {
-    this.draggedElement = null;
+    this.draggingPoint = null;
     this.canvas.style.cursor = 'inherit';
   }
 
   #handleKeyDown(event) {
     switch (event.key) {
       case 'Escape':
-        this.selectedElement.selected = false;
-        this.selectedElement = null;
+        if (this.selectedElement) {
+          this.selectedElement.selected = false;
+          this.selectedElement = null;
 
-        this.render();
+          this.render();
+        }
+
         break;
       case 'Shift':
-        this.pressingKeys.shift = true;
+        this.alignMode = true;
 
         this.render();
         break;
@@ -573,7 +640,7 @@ class GraphEditor {
   #handleKeyUp(event) {
     switch (event.key) {
       case 'Shift':
-        this.pressingKeys.shift = false;
+        this.alignMode = false;
 
         this.render();
         break;
