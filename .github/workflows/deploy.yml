@@ -18,4 +18,5 @@ jobs:
         aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
         aws_bucket: ${{ secrets.AWS_BUCKET_NAME }}
-        source_dir: 'dirname'
+        aws_region: ${{ secrets.AWS_REGION }}
+        source_dir: 'static'
