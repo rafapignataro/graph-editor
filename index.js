@@ -568,8 +568,6 @@ class GraphEditor {
           this.drawingPoint.x = this.selectedElement.x;
         }
 
-        console.log(this.drawingPoint.isEqual(segmentPoint))
-
         this.render();
 
         this.drawGuideLine(this.selectedElement, this.drawingPoint);
